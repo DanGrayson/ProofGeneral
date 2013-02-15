@@ -4,7 +4,7 @@
 ;; Author:      David Aspinall <David.Aspinall@ed.ac.uk> and others
 ;; License:     GPL (GNU GENERAL PUBLIC LICENSE)
 ;;
-;; proof-useropts.el,v 12.5 2012/08/31 21:18:04 pier Exp
+;; proof-useropts.el,v 12.6 2012/09/25 09:44:18 pier Exp
 ;;
 ;;; Commentary:
 ;;
@@ -189,9 +189,10 @@ and displayed lazily.  See `proof-layout-windows'."
 
   See `proof-layout-windows'."
   :type '(choice
-	  (const :tag "Horizontally if frame wide enough" smart)
-	  (const :tag "Horizontally" horizontal)
-	  (const :tag "Vertically" vertical))
+	  (const :tag "Adapt to current frame width" smart)
+	  (const :tag "Horizontal (three columns)" horizontal)
+	  (const :tag "Horizontal (two columns)" hybrid)
+	  (const :tag "Vertical" vertical))
   :group 'proof-user-options)
 
 

@@ -4,7 +4,7 @@
 ;; License:     GPL (GNU GENERAL PUBLIC LICENSE)
 ;; Maintainer: Pierre Courtieu <Pierre.Courtieu@cnam.fr>
 ;;
-;; coq.el,v 11.136 2012/09/14 15:32:38 da Exp
+;; coq.el,v 11.144 2012/10/03 21:22:56 pier Exp
 
 
 
@@ -24,6 +24,9 @@
     (defvar smie-rules-function nil))
   (defvar queueitems nil)       ; dynamic scope in p-s-extend-queue-hook
   (defvar proof-info nil)       ; dynamic scope in proof-tree-urgent-action
+  (defvar action nil)       ; dynamic scope in coq-insert-as stuff
+  (defvar string nil)       ; dynamic scope in coq-insert-as stuff
+  (defvar coq-auto-insert-as nil)    ; defpacustom
   (defvar coq-time-commands nil)        ; defpacustom
   (defvar coq-use-editing-holes nil)    ; defpacustom
   (defvar coq-compile-before-require nil)       ; defpacustom
@@ -378,6 +381,8 @@ SMIE is a navigation and indentation framework available in Emacs >= 23.3."
 
 (defun coq-set-undo-limit (undos)
   (proof-shell-invisible-command (format "Set Undo %s . " undos)))
+
+
 
 ;; make this non recursive?
 (defun build-list-id-from-string (s)
@@ -952,6 +957,19 @@ flag Printing All set."
 (proof-definvisible coq-show-proof "Show Proof.")
 (proof-definvisible coq-show-conjectures "Show Conjectures.")
 (proof-definvisible coq-show-intros "Show Intros.") ; see coq-insert-intros below
+(proof-definvisible coq-set-implicit-arguments "Set Implicit Arguments.")
+(proof-definvisible coq-unset-implicit-arguments "Unset Implicit Arguments.")
+(proof-definvisible coq-set-printing-all "Set Printing All.")
+(proof-definvisible coq-unset-printing-all "Unset Printing All.")
+(proof-definvisible coq-set-printing-synth "Set Printing Synth.")
+(proof-definvisible coq-unset-printing-synth "Unset Printing Synth.")
+(proof-definvisible coq-set-printing-coercions "Set Printing Coercions.")
+(proof-definvisible coq-unset-printing-coercions "Unset Printing Coercions.")
+(proof-definvisible coq-set-printing-wildcards "Set Printing Wildcard.")
+(proof-definvisible coq-unset-printing-wildcards "Unset Printing Wildcard.")
+; Takes an argument
+;(proof-definvisible coq-set-printing-printing-depth "Set Printing Printing Depth . ")
+;(proof-definvisible coq-unset-printing-printing-depth "Unset Printing Printing Depth . ")
 
 (defun coq-Compile ()
   "Compiles current buffer."
@@ -1001,15 +1019,27 @@ flag Printing All set."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Holes mode switch
-
-(defpacustom use-editing-holes t
-  "Enable holes for editing."
-  :type 'boolean)
+;; TODO: have this plugged agian when we have abbreviation without holes
+;; For now holes are always enabled.
+;(defpacustom use-editing-holes t
+;  "Enable holes for editing."
+;  :type 'boolean)
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;   Configuring proof and pbp mode and setting up various utilities  ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;; General consensus among users: flickering spans are much too annoying
+;; compared to the usefulness of tooltips.
+;; Set to t to bring it back%%
+;;
+;; FIXME: this always sets proof-output-tooltips to nil, even if the user puts
+;; explicitely the reverse in it sconfig file. I just want to change the
+;; *default* value to nil.
+(custom-set-default 'proof-output-tooltips nil)
+
 
 (defun coq-mode-config ()
   ;; Coq error messages are thrown off by TAB chars.
@@ -1080,11 +1110,6 @@ flag Printing All set."
   ;; span menu
   (setq proof-script-span-context-menu-extensions 'coq-create-span-menu)
 
-  ;; General consensus among users: flickering spans are much too annoying
-  ;; compared to the usefulness of tooltips.
-  ;; Set to t to bring it back
-  (setq proof-output-tooltips nil)
-
   (setq proof-shell-start-silent-cmd "Set Silent. "
         proof-shell-stop-silent-cmd "Unset Silent. ")
 
@@ -1095,8 +1120,9 @@ flag Printing All set."
   ;; font-lock
   (setq proof-script-font-lock-keywords coq-font-lock-keywords-1)
 
-  ;; holes
-  (if coq-use-editing-holes (holes-mode 1))
+  ;; FIXME: have abbreviation without holes
+  ;(if coq-use-editing-holes (holes-mode 1))
+  (holes-mode 1)
 
   ;; prooftree config
   (setq
@@ -1254,33 +1280,19 @@ flag Printing All set."
   :eval (coq-hide-additional-subgoals-switch))
 
 
-;; FIXME: to handle "printing all" properly, we should change the state
-;; of the variables that also depend on it.
-;; da: 
-(defpacustom print-fully-explicit nil
-  "Print fully explicit terms."
-  :type 'boolean
-  :setting ("Set Printing All. " . "Unset Printing All. "))
+;
+;;; FIXME: to handle "printing all" properly, we should change the state
+;;; of the variables that also depend on it.
+;;; da:
 
-(defpacustom print-implicit nil
-  "Print implicit arguments in applications."
-  :type 'boolean
-  :setting ("Set Printing Implicit. " . "Unset Printing Implicit. "))
-
-(defpacustom print-coercions nil
-  "Print coercions."
-  :type 'boolean
-  :setting ("Set Printing Coercions. " . "Unset Printing Coercions. "))
-
-(defpacustom print-match-wildcards t
-  "Print underscores for unused variables in matches."
-  :type 'boolean
-  :setting ("Set Printing Wildcard. " . "Unset Printing Wildcard. "))
-
-(defpacustom print-elim-types t
-  "Print synthesised result type for eliminations."
-  :type 'boolean
-  :setting ("Set Printing Synth. " . "Unset Printing Synth. "))
+;;; pc: removed it and others of the same kind. Put an "option" menu instead,
+;;; with no state variable. To have the state we should use coq command that
+;;; output the value of the variables.
+;(defpacustom print-fully-explicit nil
+;  "Print fully explicit terms."
+;  :type 'boolean
+;  :setting ("Set Printing All. " . "Unset Printing All. "))
+;
 
 (defpacustom printing-depth 50
   "Depth of pretty printer formatting, beyond which dots are displayed."
@@ -2359,26 +2371,110 @@ Based on idea mentioned in Coq reference manual."
       (insert intros)
       (indent-according-to-mode))))
 
-(defun coq-insert-infoH-hook ()
-  (with-no-warnings  ;; NB: dynamic scoping of `string'
-    (setq string (concat "infoH " string))))
 
-;; da: FIXME untested with new generic hybrid code: hope this still works
-(defun coq-insert-as ()
-  "Insert \"as\" suffix to next command, names given by \"infoH\" tactical.
-Based on idea mentioned in Coq reference manual."
-  (interactive)
-  (add-hook 'proof-shell-insert-hook 'coq-insert-infoH-hook)
-  (proof-assert-next-command-interactive)
-  (remove-hook 'proof-shell-insert-hook 'coq-insert-infoH-hook);as soon as possible
-  (proof-shell-wait)
-  (let
-      ((str (string-match "<info type=\"infoH\">\\([^<]*\\)</info>"
-                          proof-shell-last-response-output))
-       (substr (match-string 1 proof-shell-last-response-output)))
+(defvar coq-commands-accepting-as (regexp-opt '("induction" "destruct" "inversion" "injection")))
+
+(defvar coq-last-input-action nil
+  "For internal use only.
+This variable contains the last action kind that has been issued
+to coq shell, it is set to nil each time it is used by
+`coq-insert-as'. See there why. ")
+
+(defun coq-insert-infoH ()
+  "Insert the tactical into variable `string' if applicable.
+This function is intended to be added to
+`proof-shell-insert-hook', `string' is the command about to be
+issued to Coq. If `string' matches `coq-commands-accepting-as'
+and we are advancing in the script, then script is modified to
+add the info_hyps tactical. This is used for automatic \"as\"
+insertion using another hook."
+  (setq coq-last-input-action action)
+  (if (and (eq action 'proof-done-advancing)
+           (string-match coq-commands-accepting-as string))
+      (with-no-warnings  ;; NB: dynamic scoping of `string'
+        (setq string (concat "infoH " string)))))
+
+(defun coq-auto-insert-as ()
+  "This function is called whenever the `auto-insert-as' is set.
+It adds or remove hooks accordingly."
+  (if coq-auto-insert-as
+      (progn
+        (add-hook 'proof-shell-insert-hook 'coq-insert-infoH)
+        (add-hook 'proof-state-change-hook 'coq-insert-as))
+    (remove-hook 'proof-shell-insert-hook 'coq-insert-infoH)
+    (remove-hook 'proof-state-change-hook 'coq-insert-as)))
+
+(defpacustom auto-insert-as nil
+  "Insert \"as [ ... | ... ] \" after (compatible) tactics."
+  :type 'boolean)
+
+
+;; Point supposed to be at the end of locked region, that is
+;; (proof-assert-next-command-interactive) has just finished
+(defun coq-tactic-already-has-an-as-close()
+  "Return t if the last tactic of locked region contains an \"as\" close."
+  (save-excursion
     (coq-script-parse-cmdend-backward)
-    (let ((inhibit-read-only t))
-      (insert (concat " as " substr)))))
+    (let ((endpos (point))
+          (startpos (coq-find-real-start)))
+      (string-match "\\<as\\>" (buffer-substring startpos endpos)))))
+
+
+;; da: FIXME untested with new generic hybrid code: hope this still works ;;
+;; pc: seems ok, some hack was needed below because when backtracking the
+;; coq-state-change-hook is called first with a 'advancing action (issuing the
+;; backtrack command??) and then a second time with the 'retracting action.
+;; Therefore we have to set coq-last-input-action to nil explicitely to avoid
+;; this function to do something wrong with a previous value.
+(defun coq-insert-as ()
+  "Assert next command and insert \"as\" suffix to it.
+Only if there is not already an as close. Names given by
+\"infoH\" tactical. Based on idea mentioned in Coq reference
+manual. oint is supposed to be at the end of locked region.
+Typically after a proof-assert-next-command.
+
+* Warning: infoH tactical is implemented in coq versions later
+  than 8.4. More precisely: coq trunk on Oct 1st, 2012 (coq svn
+  revision 15839)."
+  (interactive)
+  (when (and (eq coq-last-input-action 'proof-done-advancing) proof-shell-last-output)
+    (let*
+        ((str (string-match "<infoH>\\([^<]*\\)</infoH>"
+                            ;; proof-shell-last-response-output would be
+                            ;; smaller/faster but since this message is output
+                            ;; *before* resulting goals, it is not detected as
+                            ;; a response message.
+                            proof-shell-last-output))
+         (substr  (or (and str (match-string 1 proof-shell-last-output)) ""))
+         ;; emptysubstr = t if substr is empty or contains only spaces and |
+         (emptysubstr (and (string-match "\\(\\s-\\||\\)*" substr)
+                           (eq (length substr) (length (match-string 0 substr)))))) ; idem
+      (unless (or emptysubstr (coq-tactic-already-has-an-as-close))
+        (save-excursion
+          ;; TODO: look for eqn:XX and go before it.
+          ;; Go just before the last "."
+          (coq-script-parse-cmdend-backward)
+          (let ((inhibit-read-only t))
+            (insert (concat " as [" substr "]")))))))
+  ;; HACKY: The hook proof-state-change-hook is called too many times (when
+  ;; backtracking in particular), so once we have inserted the as close (or we
+  ;; have decide not to do so) we erase the action so that the next call to
+  ;; this hook will do nothing until infoH is inserted again.
+  (setq coq-last-input-action nil))
+
+;; Trying to propose insertion of "as" for a whole region. But iterating
+;; proof-assert-next-command-interactive is probably wrong if some error occur
+;; during scripting.
+(defun coq-insert-as-in-region (&optional beg end)
+  (let ((beg (or beg (point-min)))
+        (end (or end (point-max))))
+    (goto-char beg)
+    (while (< (point) end)
+      (coq-script-parse-cmdend-forward)
+      (proof-assert-next-command-interactive)
+      )
+    ))
+
 
 
 (defun coq-insert-match ()
@@ -2797,7 +2893,7 @@ are non-nil at the same time, this gives priority to the former."
       (self-insert-command (or count 1)))))
 
 ;; Setting the new mapping for terminator
-(define-key coq-mode-map (kbd ".") 'coq-terminator-insert)
+;(define-key coq-mode-map (kbd ".") 'coq-terminator-insert)
 ;(define-key coq-mode-map (kbd ";") 'coq-terminator-insert) ; for french keyboards
 
 

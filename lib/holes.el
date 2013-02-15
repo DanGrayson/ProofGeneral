@@ -2,7 +2,7 @@
 ;;
 ;; Copyright (C) 2001 Pierre Courtieu
 ;;
-;; holes.el,v 12.1 2012/08/30 14:30:23 monnier Exp
+;; holes.el,v 12.2 2012/09/19 13:34:47 pier Exp
 ;;
 ;; This file uses spans, an interface for extent (XEmacs) and overlays
 ;; (emacs), by Healfdene Goguen for the proofgeneral mode.
@@ -625,8 +625,9 @@ created.  Return the number of holes created."
        (holes-set-point-next-hole-destroy)) ; if only one hole, go to it.
       (t
        (goto-char pos)
-       (message (substitute-command-keys
-		 "\\[holes-set-point-next-hole-destroy] to jump to active hole.  \\[holes-short-doc] to see holes doc."))))))
+       (unless (active-minibuffer-window) ; otherwise minibuffer gets hidden
+	 (message (substitute-command-keys
+		   "\\[holes-set-point-next-hole-destroy] to jump to active hole.  \\[holes-short-doc] to see holes doc.")))))))
 
 
 ;;;###autoload
