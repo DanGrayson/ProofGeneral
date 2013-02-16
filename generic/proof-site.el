@@ -40,6 +40,7 @@
       (isar "Isabelle" "thy")
       (coq "Coq" "v" nil (".vo" ".glob"))
       (phox "PhoX" "phx")
+      (tts "TTS" "tts")
 
       ;; Obscure instances or conflict with other Emacs modes.
 
