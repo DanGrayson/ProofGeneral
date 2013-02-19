@@ -8,8 +8,9 @@
 (proof-easy-config
  'tts "TTS"
  proof-prog-name			"checker --proof-general"
+ proof-save-command-regexp		"Defined." ; not implemented in the checker yet
  proof-terminal-string			"."
- proof-arbitrary-undo-positions		t	; or make (proof-last-goal-or-goalsave) work
+ proof-arbitrary-undo-positions		nil	; if t, then make (proof-last-goal-or-goalsave) work
  proof-kill-goal-command		"Back."
  proof-undo-n-times-cmd			"Back %s."
  proof-ignore-for-undo-count		"Back[^.]*\\."
