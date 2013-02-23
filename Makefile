@@ -37,7 +37,7 @@ DEST_PREFIX=$(DESTDIR)/usr
 
 PWD=$(shell pwd)
 
-PROVERS=acl2 ccc coq hol98 isar lego hol-light phox pgshell pgocaml pghaskell tts
+PROVERS=acl2 ccc coq hol98 isar lego hol-light phox pgshell pgocaml pghaskell ts
 OTHER_ELISP=generic lib contrib/mmm
 ELISP_DIRS=${PROVERS} ${OTHER_ELISP}
 ELISP_EXTRAS=isar/interface isar/isartags
