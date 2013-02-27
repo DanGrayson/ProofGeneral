@@ -157,7 +157,8 @@ Following POLICY, which can be one of 'smart, 'horizontal,
 (defun proof-display-three-b (&optional policy)
   "Layout three buffers in a single frame.  Only do this if buffers exist."
   (interactive)
-  (when (and (buffer-live-p proof-goals-buffer)
+  (when (and (buffer-live-p proof-script-buffer)
+	     (buffer-live-p proof-goals-buffer)
 	     (buffer-live-p proof-response-buffer))
     (save-excursion
       (proof-select-three-b
