@@ -4,7 +4,7 @@
 ;; Author:      David Aspinall <David.Aspinall@ed.ac.uk> and others
 ;; License:     GPL (GNU GENERAL PUBLIC LICENSE)
 ;;
-;; proof-useropts.el,v 12.6 2012/09/25 09:44:18 pier Exp
+;; proof-useropts.el,v 12.7 2012/11/13 08:01:12 tews Exp
 ;;
 ;;; Commentary:
 ;;
@@ -183,8 +183,8 @@ and displayed lazily.  See `proof-layout-windows'."
 - If 'horizontal then always have scripting buffer on the right
   and goal and response buffers on the left (one above the
   other).
-- If 'smart or anything else means: 'horizontal when the window
-  is wide enough and horizontally otherwise. The widht threshold
+- If 'smart or anything else: 'horizontal when the window
+  is wide enough and 'vertical otherwise. The width threshold
   is given by `split-width-threshold'.
 
   See `proof-layout-windows'."

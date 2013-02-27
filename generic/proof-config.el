@@ -4,7 +4,7 @@
 ;; Author:      David Aspinall <David.Aspinall@ed.ac.uk> and others
 ;; License:     GPL (GNU GENERAL PUBLIC LICENSE)
 ;;
-;; proof-config.el,v 12.7 2012/09/14 15:35:23 da Exp
+;; proof-config.el,v 12.8 2012/11/13 22:05:11 tews Exp
 ;;
 ;;; Commentary:
 ;;
@@ -1630,6 +1630,17 @@ error/interrupt.
 
 Remark: This hook is called from shell buffer.  If you want to do
 something in scripting buffer, `save-excursion' and/or `set-buffer'."
+  :type '(repeat function)
+  :group 'proof-shell)
+
+(defcustom proof-shell-signal-interrupt-hook nil
+  "Run when the user tries to interrupt the prover.
+This hook is run inside `proof-interrupt-process' when the user
+tries to interrupt the proof process. It is therefore run earlier
+than `proof-shell-handle-error-or-interrupt-hook', which runs
+when the interrupt is acknowledged inside `proof-shell-exec-loop'.
+
+This hook also runs when the proof assistent is killed."
   :type '(repeat function)
   :group 'proof-shell)
 

@@ -2791,7 +2791,7 @@ regions in the proof script.
      screen), you can force a frame to stick to showing the goals or
      response buffer.
 
-     The default value is `nil'.
+     The default value is `t'.
 
 Sometimes during script management, there is no response from the proof
 assistant to some command.  In this case you might like the empty
@@ -2838,21 +2838,46 @@ buffers or refresh the window layout.  These are on the menu:
      two buffers.  The idea of this function is to change the
      window->buffer mapping without adjusting window layout.
 
- -- Command: proof-layout-windows &optional nohorizontalsplit
+ -- Command: proof-layout-windows
      Refresh the display of windows according to current display mode.
-
-     For single frame mode, this uses a canonical layout made by
-     splitting Emacs windows vertically in equal proportions.  You can
-     then adjust the proportions by dragging the separating bars.  In
-     three pane mode, the canonical layout is to split both
-     horizontally and vertically, to display the prover responses in
-     two panes on the right-hand side, and the proof script in a taller
-     pane on the left.  A prefix argument will prevent the horizontal
-     split, and result in three windows spanning the full width of the
-     Emacs frame.
 
      For multiple frame mode, this function obeys the setting of
      ``pg-response-eagerly-raise'', which see.
+
+     For single frame mode:
+
+     - In two panes mode, this uses a canonical layout made by splitting
+     Emacs windows in equal proportions. The splitting is vertical if
+     emacs width is smaller than ``split-width-threshold'' and
+     horizontal otherwise. You can then adjust the proportions by
+     dragging the separating bars.
+
+     - In three pane mode, there are three display modes, depending
+            where the three useful buffers are displayed: scripting
+            buffer, goals buffer and response buffer.
+
+            Here are the three modes:
+
+            - vertical: the 3 buffers are displayed in one column.
+            - hybrid: 2 columns mode, left column displays scripting buffer
+              and right column displays the 2 others.
+            - horizontal: 3 columns mode, one for each buffer (script, goals,
+              response).
+
+            By default, the display mode is automatically chosen by
+            considering the current emacs frame width: if it is smaller
+            than ``split-width-threshold'' then vertical mode is chosen,
+            otherwise if it is smaller than 1.5 * ``split-width-threshold''
+            then hybrid mode is chosen, finally if the frame is larger than
+            1.5 * ``split-width-threshold'' then the horizontal mode is chosen.
+
+            You can change the value of ``split-width-threshold'' at your
+            will.
+
+            If you want to force one of the layouts, you can set variable
+            ``proof-three-window-mode-policy'' to `'vertical', `'horizontal' or
+            `'hybrid'. The default value is `'smart' which sets the automatic
+            behaviour described above.
 
  -- User Option: proof-shrink-windows-tofit
      If non-nil, automatically shrink output windows to fit contents.
@@ -2877,7 +2902,7 @@ buffers or refresh the window layout.  These are on the menu:
      of the output region is displayed.  Changes of this option will
      not be reflected in already-processed regions of the script.
 
-     The default value is `t'.
+     The default value is `nil'.
 
 
 File: ProofGeneral.info,  Node: User options,  Next: Changing faces,  Prev: Display customization,  Up: Customizing Proof General
@@ -3561,12 +3586,21 @@ Locking ancestors
 
      The compilation feature does currently not support ML modules.
 
-The current version works reliably, even when stress-tested with
-changing random files in large Coq projects. However, some features
-have been spared for the next release, *note Current Limitations::.
+There are actually two implementations of the Recompilation feature.
 
-To enable the automatic compilation feature there are three points to
-adhere to:
+Synchronous single threaded compilation (stable)
+     With synchronous compilation, coqdep and coqc are called
+     synchronously for each Require command. Proof General is locked
+     until the compilation finishes
+
+Parallel asynchronous compilation (experimental)
+     With parallel compilation, coqdep and coqc are launched in the
+     background and Proof General stays responsive during compilation.
+     Up to `coq-max-background-compilation-jobs' coqdep and coqc
+     processes may run in parallel.
+
+To enable the automatic compilation feature, you have to follow these
+points:
 
    * The option `coq-compile-before-require' must be turned on (menu
      `Coq -> Settings -> Compile Before Require').
@@ -3587,6 +3621,13 @@ adhere to:
      `coq-compile-command' can be left empty. In this case Proof
      General calls `coqdep' and `coqc' as needed.
 
+   * The default compilation method is synchronous compilation. In
+     order to experience parallel background compilation on all your
+     CPU cores, enable `coq-compile-parallel-in-background' (menu `Coq
+     -> Settings -> Compile Parallel In Background'). Configure
+     `coq-max-background-compilation-jobs' if you want to limit the
+     number of parallel background jobs.
+
 * Menu:
 
 * Automatic Compilation in Detail::
@@ -3604,9 +3645,9 @@ When `coq-compile-before-require' is enabled, Proof General looks for
 `Require' commands in text that gets asserted (i.e., in text that is
 moved from the editing region to the queue region, *note Locked queue
 and editing regions::). If Proof General finds a `Require' command, it
-checks the dependencies and (re-)compiles files as necessary. Only after
-this compilation is finished, Proof General starts sending the asserted
-text to the Coq process.
+checks the dependencies and (re-)compiles files as necessary. The
+Require command and the following text is only sent to Coq after the
+compilation finished.
 
 `Declare ML Module' commands are currently not recognized.
 
@@ -3642,11 +3683,6 @@ error locations.  Note however, that `coqdep' does not produce error
 messages with location information, so `C-x `' cannot work for errors
 from `coqdep'.
 
-For simplicity, internal compilation is currently done with
-synchronously running external commands. Therefore, for internal
-compilation, Emacs is locked and unresponsive until the compilation
-finishes.
-
 Proof General cannot know if some library files have been updated
 outside of Proof General, therefore, it must perform the dependency
 checking for each `Require' command. If the continuous confirmation of
@@ -3660,6 +3696,42 @@ are two orthogonal choices: One may wish to save all or only the Coq
 source files, and, one may or may not want to confirm the saving of
 each file.
 
+With `coq-compile-parallel-in-background' (menu `Coq -> Settings ->
+Compile Parallel In Background') you can choose between two
+implementations of internal compilation.
+
+Synchronous single threaded compilation
+     This is the stable version supported since Proof General version
+     4.1. This method starts coqdep and coqc processes one after each
+     other in synchronous subprocesses. Your Emacs session will be
+     locked until compilation finishes. Use `C-g' to interrupt
+     compilation.
+
+Parallel asynchronous compilation
+     This is the new version added in Proof General version 4.3. It
+     runs up to `coq-max-background-compilation-jobs' coqdep and coqc
+     jobs in parallel in asynchronous subprocesses (or uses all your
+     CPU cores if `coq-max-background-compilation-jobs' equals
+     `'all-cpus'). Your Emacs will stay responsive during compilation.
+     Use `C-c C-c' or the tool bar icons for interrupt or restart to
+     interrupt compilation.
+
+     For the usual case, you have at most
+     `coq-max-background-compilation-jobs' parallel processes
+     _including_ your Proof General process. The usual case applies,
+     when the Require commands are the first commands in the file. If
+     you have other commands between two Require commands or before the
+     first Require, then you may see Proof General and Coq running in
+     addition to `coq-max-background-compilation-jobs' compilation jobs.
+
+     Actually, even with this method, not everything runs
+     asynchronously. To translate module identifiers from the Coq
+     sources into file names, Proof General runs coqdep on an
+     automatically generated, one-line file. These coqdep jobs run
+     synchronously while the Require commands are parsed. The coqdep
+     jobs on the real source files do run asynchronously in the
+     background.
+
 
 File: ProofGeneral.info,  Node: Locking Ancestors,  Next: Customizing Coq Multiple File Support,  Prev: Automatic Compilation in Detail,  Up: Multiple File Support
 
@@ -3672,22 +3744,25 @@ performs dependency checking and compilation itself. If an external
 command is used, Proof General does not see all dependencies and can
 therefore only lock direct ancestors.
 
-Currently, locking ancestor files might not exactly do what Coq users
-expect. There are two ways around this problem: You can either switch
-ancestor locking completely off via `coq-lock-ancestors' (*note
-Customizing Coq Multiple File Support::) or you can generally permit
-editing in locked sections with selecting `Proof-General' -> `Quick
-Options' -> `Read Only' -> `Freely Edit' (which will set the option
-`proof-strict-read-only' to `nil').
-
 In the default setting, when you want to edit a locked ancestor, you are
-forced to completely retract the current scripting buffer. The right
-behaviour for Coq would be to retract the current scripting buffer only
-up to the point before the appropriate `Require' command. At the users
-choice it should also be possible to unlock the ancestor without
-retracting the current scripting buffer. The latter would be adequate,
-if you just want to add a lemma in the ancestor _and_ want to continue
-the development in the current scripting buffer without interruption.
+forced to completely retract the current scripting buffer.  You can
+simplify this by setting `proof-strict-read-only' to `'retract' (menu
+`Proof-General -> Quick Options -> Read Only -> Undo On Edit'). Then
+typing in some ancestor will immediately retract you current scripting
+buffer and unlock that ancestor.
+
+You have two choices, if you don't like ancestor locking in its default
+way.  You can either switch ancestor locking completely off via
+`coq-lock-ancestors' (*note Customizing Coq Multiple File Support::) or
+you can generally permit editing in locked sections with selecting
+`Proof-General' -> `Quick Options' -> `Read Only' -> `Freely Edit'
+(which will set the option `proof-strict-read-only' to `nil').
+
+[The right behaviour for Coq, namely to retract the current scripting
+buffer only up to the appropriate `Require' command, would be quite
+difficult to implement in the current Proof General infrastructure.
+Further, it has only dubious benefit, as Require commands are usually
+on the top of each file.]
 
 
 File: ProofGeneral.info,  Node: Customizing Coq Multiple File Support,  Next: Current Limitations,  Prev: Locking Ancestors,  Up: Multiple File Support
@@ -3724,6 +3799,32 @@ Customize -> Coq -> Coq Auto Compile -> Coq Auto Compile'.
      buffers, `'save-coq' to save all modified Coq buffers without
      confirmation and `'save-all' to save all modified buffers without
      confirmation.
+
+The following two options are for the parallel compilation method.
+
+ -- Variable: coq-compile-parallel-in-background
+     Choose the internal compilation method.
+     When Proof General compiles itself, you have the choice between
+     two implementations. If this setting is nil, then Proof General
+     uses the old implementation and compiles everything sequentially
+     with synchronous job. With this old method Proof General is locked
+     during compilation. If this setting is t, then the new method is
+     used and compilation jobs are dispatched in parallel in the
+     background. The maximal number of parallel compilation jobs is set
+     with ``coq-max-background-compilation-jobs''.
+
+     This option can be set/reset via menu `Coq -> Settings -> Compile
+     Parallel In Background'.
+
+ -- Variable: coq-max-background-compilation-jobs
+     Maximal number of parallel jobs, if parallel compilation is
+     enabled.
+     Use the number of available CPU cores if this is set to
+     `'all-cpus'. This variable is the user setting. The value that is
+     really used is ``coq-internal-max-jobs''. Use
+     ``coq-max-jobs-setter'' or the customization system to change this
+     variable. Otherwise your change will have no effect, because
+     ``coq-internal-max-jobs'' is not adapted.
 
 The following two options deal with the load path. Proof General
 divides the load path into the standard load path (which is hardwired
@@ -3885,22 +3986,19 @@ File: ProofGeneral.info,  Node: Current Limitations,  Prev: Customizing Coq Mult
 --------------------------
 
 In the current release some aspects of multiple file support have not
-been implemented. The following points will hopefully addressed in the
-next release:
+been implemented. The following points will hopefully be addressed at
+some stage.
 
    * Support `Declare ML Module' commands.
-
-   * Improved undo behaviour for locked ancestors.
-
-   * Use always asynchronous processes for compilation and do not lock
-     up Emacs in internal compilation mode.
 
    * Increase precision when comparing modification times. Because of
      an Emacs limitation, modification time stamps of files have only a
      precision of 1 second. If several compiled Coq object files have
      been created in the same second, Proof General is optimistic and
      does not recompile. (Note that GNU make behaves the same on file
-     systems that record time stamps only with a precision of 1 second.)
+     systems that record time stamps only with a precision of 1
+     second.) Emacs version 24.3 implements high precision time stamps
+     on files.
 
 
 File: ProofGeneral.info,  Node: Editing multiple proofs,  Next: User-loaded tactics,  Prev: Multiple File Support,  Up: Coq Proof General
@@ -5004,28 +5102,32 @@ Variable and User Option Index
 * coq-compile-before-require:            Customizing Coq Multiple File Support.
                                                               (line  13)
 * coq-compile-command:                   Customizing Coq Multiple File Support.
-                                                              (line  76)
+                                                              (line 102)
 * coq-compile-ignore-library-directory:  Customizing Coq Multiple File Support.
-                                                              (line 145)
+                                                              (line 171)
 * coq-compile-ignored-directories:       Customizing Coq Multiple File Support.
-                                                              (line 135)
+                                                              (line 161)
+* coq-compile-parallel-in-background:    Customizing Coq Multiple File Support.
+                                                              (line  39)
 * coq-compile-substitution-list:         Customizing Coq Multiple File Support.
-                                                              (line 160)
+                                                              (line 186)
 * coq-confirm-external-compilation:      Customizing Coq Multiple File Support.
-                                                              (line 100)
+                                                              (line 126)
 * coq-coqdep-error-regexp:               Customizing Coq Multiple File Support.
-                                                              (line 118)
+                                                              (line 144)
 * coq-load-path:                         Customizing Coq Multiple File Support.
-                                                              (line  46)
+                                                              (line  72)
 * coq-load-path-include-current:         Customizing Coq Multiple File Support.
-                                                              (line  68)
+                                                              (line  94)
 * coq-lock-ancestors:                    Customizing Coq Multiple File Support.
-                                                              (line 109)
+                                                              (line 135)
+* coq-max-background-compilation-jobs:   Customizing Coq Multiple File Support.
+                                                              (line  53)
 * coq-mode-hooks:                        Syntax highlighting. (line   6)
 * coq-require-command-regexp:            Customizing Coq Multiple File Support.
-                                                              (line 175)
+                                                              (line 201)
 * coq-require-id-regexp:                 Customizing Coq Multiple File Support.
-                                                              (line 182)
+                                                              (line 208)
 * isa-mode-hooks:                        Syntax highlighting. (line   6)
 * isabelle-chosen-logic:                 Choosing logic and starting isabelle.
                                                               (line  48)
@@ -5052,7 +5154,7 @@ Variable and User Option Index
 * proof-autosend-enable:                 Automatic processing.
                                                               (line   6)
 * proof-colour-locked:                   Display customization.
-                                                              (line 127)
+                                                              (line 152)
 * proof-delete-empty-windows:            Display customization.
                                                               (line  64)
 * proof-disappearing-proofs:             Visibility of completed proofs.
@@ -5069,7 +5171,7 @@ Variable and User Option Index
                                                               (line  82)
 * proof-next-command-insert-space:       User options.        (line  35)
 * proof-output-tooltips:                 Display customization.
-                                                              (line 134)
+                                                              (line 159)
 * proof-prog-name-ask:                   User options.        (line  74)
 * proof-prog-name-guess:                 User options.        (line 102)
 * proof-query-file-save-when-activating-scripting: User options.
@@ -5078,7 +5180,7 @@ Variable and User Option Index
 * proof-script-indent:                   Script editing commands.
                                                               (line  10)
 * proof-shrink-windows-tofit:            Display customization.
-                                                              (line 120)
+                                                              (line 145)
 * proof-splash-enable:                   User options.        (line  19)
 * proof-strict-read-only:                Document centred working.
                                                               (line  84)
@@ -5427,57 +5529,57 @@ Node: Customizing Proof General114025
 Node: Basic options115666
 Node: How to customize116508
 Node: Display customization118417
-Node: User options124976
-Node: Changing faces132926
-Node: Script buffer faces133907
-Node: Goals and response faces135068
-Node: Tweaking configuration settings136293
-Node: Hints and Tips138660
-Node: Adding your own keybindings139363
-Node: Using file variables142056
-Node: Using abbreviations144821
-Node: LEGO Proof General146174
-Ref: LEGO Proof General-Footnote-1147446
-Node: LEGO specific commands147526
-Node: LEGO tags147990
-Node: LEGO customizations148346
-Node: Coq Proof General148889
-Node: Coq-specific commands149359
-Node: Multiple File Support149850
-Node: Automatic Compilation in Detail152509
-Node: Locking Ancestors155833
-Node: Customizing Coq Multiple File Support157373
-Node: Current Limitations166745
-Node: Editing multiple proofs167723
-Node: User-loaded tactics168953
-Node: Holes feature171372
-Node: Proof-Tree Visualization172683
-Node: Isabelle Proof General173279
-Node: Choosing logic and starting isabelle174157
-Node: Isabelle commands176765
-Node: Isabelle settings179897
-Node: Isabelle customizations180602
-Node: HOL Light Proof General180968
-Node: Shell Proof General182700
-Node: Obtaining and Installing184116
-Node: Obtaining Proof General184584
-Node: Installing Proof General from tarball185529
-Node: Setting the names of binaries186401
-Node: Notes for syssies187440
-Node: Bugs and Enhancements190037
-Node: References190941
-Node: History of Proof General191948
-Node: Old News for 3.0195982
-Node: Old News for 3.1199737
-Node: Old News for 3.2201007
-Node: Old News for 3.3204059
-Node: Old News for 3.4205068
-Node: Old News for 3.5206235
-Node: Old News for 3.6206403
-Node: Old News for 3.7206615
-Node: Function Index208084
-Node: Variable Index216935
-Node: Keystroke Index223887
-Node: Concept Index229592
+Node: User options126060
+Node: Changing faces134010
+Node: Script buffer faces134991
+Node: Goals and response faces136152
+Node: Tweaking configuration settings137377
+Node: Hints and Tips139744
+Node: Adding your own keybindings140447
+Node: Using file variables143140
+Node: Using abbreviations145905
+Node: LEGO Proof General147258
+Ref: LEGO Proof General-Footnote-1148530
+Node: LEGO specific commands148610
+Node: LEGO tags149074
+Node: LEGO customizations149430
+Node: Coq Proof General149973
+Node: Coq-specific commands150443
+Node: Multiple File Support150934
+Node: Automatic Compilation in Detail154346
+Node: Locking Ancestors159288
+Node: Customizing Coq Multiple File Support160913
+Node: Current Limitations171586
+Node: Editing multiple proofs172470
+Node: User-loaded tactics173700
+Node: Holes feature176119
+Node: Proof-Tree Visualization177430
+Node: Isabelle Proof General178026
+Node: Choosing logic and starting isabelle178904
+Node: Isabelle commands181512
+Node: Isabelle settings184644
+Node: Isabelle customizations185349
+Node: HOL Light Proof General185715
+Node: Shell Proof General187447
+Node: Obtaining and Installing188863
+Node: Obtaining Proof General189331
+Node: Installing Proof General from tarball190276
+Node: Setting the names of binaries191148
+Node: Notes for syssies192187
+Node: Bugs and Enhancements194784
+Node: References195688
+Node: History of Proof General196695
+Node: Old News for 3.0200729
+Node: Old News for 3.1204484
+Node: Old News for 3.2205754
+Node: Old News for 3.3208806
+Node: Old News for 3.4209815
+Node: Old News for 3.5210982
+Node: Old News for 3.6211150
+Node: Old News for 3.7211362
+Node: Function Index212831
+Node: Variable Index221682
+Node: Keystroke Index228940
+Node: Concept Index234645
 
 End Tag Table

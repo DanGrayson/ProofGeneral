@@ -4,7 +4,7 @@
 ;; Author:      David Aspinall <David.Aspinall@ed.ac.uk>
 ;; License:     GPL (GNU GENERAL PUBLIC LICENSE)
 ;;
-;; proof-site.el,v 12.24 2012/10/19 16:13:35 da Exp
+;; proof-site.el,v 12.26 2013/01/11 14:30:54 da Exp
 ;;
 ;;; Commentary:
 ;; 
@@ -72,7 +72,7 @@
 
 (eval-and-compile
 ;; WARNING: do not edit next line (constant is edited in Makefile.devel)
-  (defconst proof-general-version "Proof General Version 4.2. Released by da on Fri 19 Oct 2012."
+  (defconst proof-general-version "Proof General Version 4.3pre130111. Released by da."
     "Version string identifying Proof General release."))
 
 (defconst proof-general-short-version

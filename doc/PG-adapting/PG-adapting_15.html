@@ -1,6 +1,6 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html401/loose.dtd">
 <html>
-<!-- Created on October 19, 2012 by texi2html 1.82
+<!-- Created on January 11, 2013 by texi2html 1.82
 texi2html was written by: 
             Lionel Cons <Lionel.Cons@cern.ch> (original author)
             Karl Berry  <karl@freefriends.org>
@@ -315,7 +315,7 @@ in the <code>proof-assistants</code> setting.
 <dl>
 <dt><a name="index-proof_002dassistants"></a><u>User Option:</u> <b>proof-assistants</b></dt>
 <dd><p>Choice of proof assistants to use with Proof General.<br>
-A list of symbols chosen from: <code>'isar</code> <code>'coq</code> <code>'phox</code> <code>'hol-light</code> <code>'pgshell</code> <code>'pgocaml</code> <code>'pghaskell</code>.
+A list of symbols chosen from: <code>'isar</code> <code>'coq</code> <code>'phox</code> <code>'pgshell</code> <code>'pgocaml</code> <code>'pghaskell</code>.
 If nil, the default will be ALL available proof assistants.
 </p>
 <p>Each proof assistant defines its own instance of Proof General,
@@ -907,6 +907,35 @@ printing hints).
 <p>See the functions &lsquo;<samp><code>proof-start-queue</code></samp>&rsquo; and &lsquo;<samp><code>proof-shell-exec-loop</code></samp>&rsquo;.
 </p></dd></dl>
 
+<p>In Proof General 4.2 and earlier it was always the case that all
+items from the queue region were present in
+<code>proof-action-list</code>. Because of the new parallel background
+compilation for Coq, this is no longer the case. Prover specific
+code may now store items from the queue region somewhere else. To
+notify generic Proof General about this, it must set
+<code>proof-second-action-list-active</code> for the time where some
+queue items are missing from <code>proof-action-list</code>. In this
+case Proof General keeps the proof shell lock and the queue span
+even in case <code>proof-action-list</code> gets empty. Coq uses this
+feature to hold back Require commands and the following text
+until the asynchronous background compilation finishes.
+</p>
+<dl>
+<dt><a name="index-proof_002dsecond_002daction_002dlist_002dactive"></a><u>Variable:</u> <b>proof-second-action-list-active</b></dt>
+<dd><p>Signals that some items are waiting outside of &lsquo;<samp><code>proof-action-list</code></samp>&rsquo;.<br>
+If this is t it means that some items from the queue region are
+waiting for being processed in a place different from
+&lsquo;<samp><code>proof-action-list</code></samp>&rsquo;. In this case Proof General must behave as if
+&lsquo;<samp><code>proof-action-list</code></samp>&rsquo; would be non-empty, when it is, in fact,
+empty.
+</p>
+<p>This is used, for instance, for parallel background compilation
+for Coq: The Require command and the following items are not put
+into &lsquo;<samp><code>proof-action-list</code></samp>&rsquo; and are stored somewhere else until the
+background compilation finishes. Then those items are put into
+&lsquo;<samp><code>proof-action-list</code></samp>&rsquo; for getting processed.
+</p></dd></dl>
+
 <dl>
 <dt><a name="index-pg_002dsubterm_002danns_002duse_002dstack"></a><u>Variable:</u> <b>pg-subterm-anns-use-stack</b></dt>
 <dd><p>Choice of syntax tree encoding for terms.
@@ -1285,15 +1314,25 @@ ends with text matching &lsquo;<samp><code>proof-shell-eager-annotation-end</cod
 </p></dd></dl>
 
 <p>The main processing point which triggers other actions is
-<code>proof-shell-filter</code>.
+<code>proof-shell-filter</code>. It is called from
+<code>proof-shell-filter-wrapper</code>, which itself is called from an
+ordinary Emacs process filter inside the simplified <code>comint</code>
+library that is distributed with Proof General (in
+<code>lib/scomint.el</code>).
 </p>
 <dl>
-<dt><a name="index-proof_002dshell_002dfilter"></a><u>Function:</u> <b>proof-shell-filter</b><i> str</i></dt>
+<dt><a name="index-proof_002dshell_002dfilter"></a><u>Function:</u> <b>proof-shell-filter</b></dt>
 <dd><p>Master filter for the proof assistant shell-process.<br>
 A function for &lsquo;<samp><code>scomint-output-filter-functions</code></samp>&rsquo;.
 </p>
-<p>Deal with output <var>str</var> and issue new input from the queue.  This is
-an important internal function.
+<p>Deal with output and issue new input from the queue. This is an
+important internal function. The output must be collected from
+&lsquo;<samp><code>proof-shell-buffer</code></samp>&rsquo; for the following reason. This function
+might block inside &lsquo;<samp><code>process-send-string</code></samp>&rsquo; when sending input to
+the proof assistant or to prooftree. In this case Emacs might
+call the process filter again while the previous instance is
+still running. &lsquo;<samp><code>proof-shell-filter-wrapper</code></samp>&rsquo; detects and delays
+such calls but does not buffer the output.
 </p>
 <p>Handle urgent messages first.  As many as possible are processed,
 using the function &lsquo;<samp><code>proof-shell-process-urgent-messages</code></samp>&rsquo;.
@@ -1350,8 +1389,22 @@ output that slows down processing.
 by the filter is to send the next command from the queue.
 </p></dd></dl>
 
-
-
+<dl>
+<dt><a name="index-proof_002dshell_002dfilter_002dwrapper"></a><u>Function:</u> <b>proof-shell-filter-wrapper</b><i> str-do-not-use</i></dt>
+<dd><p>Wrapper for &lsquo;<samp><code>proof-shell-filter</code></samp>&rsquo;, protecting against parallel calls.<br>
+In Emacs a process filter function can be called while the same
+filter is currently running for the same process, for instance,
+when the filter bocks on I/O. This wrapper protects the main
+entry point, &lsquo;<samp><code>proof-shell-filter</code></samp>&rsquo; against such parallel,
+overlapping calls.
+</p>
+<p>The argument <var>str-do-not-use</var> contains the most recent output, but
+is discarded. &lsquo;<samp><code>proof-shell-filter</code></samp>&rsquo; collects the output from
+&lsquo;<samp><code>proof-shell-buffer</code></samp>&rsquo; (where it is inserted by
+&lsquo;<samp><code>scomint-output-filter</code></samp>&rsquo;), relieving this function from the task
+to buffer the output that arrives during parallel, overlapping
+calls.
+</p></dd></dl>
 
 
 
@@ -1409,7 +1462,7 @@ Reference Manual.  I recommend using the source-level debugger
 </tr></table>
 <p>
  <font size="-1">
-  This document was generated by <em>David Aspinall</em> on <em>October 19, 2012</em> using <a href="http://www.nongnu.org/texi2html/"><em>texi2html 1.82</em></a>.
+  This document was generated by <em>David Aspinall</em> on <em>January 11, 2013</em> using <a href="http://www.nongnu.org/texi2html/"><em>texi2html 1.82</em></a>.
  </font>
  <br>
 

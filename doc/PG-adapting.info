@@ -234,9 +234,8 @@ Here is how to go about adding support for a new prover.
      ``proof-home-directory''.
 
      The default value is `((isar "Isabelle" "thy") (coq "Coq" "v" nil
-     (".vo" ".glob")) (phox "PhoX" "phx") (hol-light "HOL Light" "ml")
-     (pgshell "PG-Shell" "pgsh") (pgocaml "PG-OCaml" "pgml") (pghaskell
-     "PG-Haskell" "pghci"))'.
+     (".vo" ".glob")) (phox "PhoX" "phx") (pgshell "PG-Shell" "pgsh")
+     (pgocaml "PG-OCaml" "pgml") (pghaskell "PG-Haskell" "pghci"))'.
 
 The final step of the description above is where the work lies.  There
 are two basic methods.  You can write some Emacs lisp functions and
@@ -2835,9 +2834,9 @@ extension.  The proof assistants enabled are the ones listed in the
 
  -- User Option: proof-assistants
      Choice of proof assistants to use with Proof General.
-     A list of symbols chosen from: `'isar' `'coq' `'phox' `'hol-light'
-     `'pgshell' `'pgocaml' `'pghaskell'.  If nil, the default will be
-     ALL available proof assistants.
+     A list of symbols chosen from: `'isar' `'coq' `'phox' `'pgshell'
+     `'pgocaml' `'pghaskell'.  If nil, the default will be ALL
+     available proof assistants.
 
      Each proof assistant defines its own instance of Proof General,
      providing session control, script management, etc.  Proof General
@@ -3368,6 +3367,33 @@ interaction with the process.
      See the functions ``proof-start-queue'' and
      ``proof-shell-exec-loop''.
 
+In Proof General 4.2 and earlier it was always the case that all items
+from the queue region were present in `proof-action-list'. Because of
+the new parallel background compilation for Coq, this is no longer the
+case. Prover specific code may now store items from the queue region
+somewhere else. To notify generic Proof General about this, it must set
+`proof-second-action-list-active' for the time where some queue items
+are missing from `proof-action-list'. In this case Proof General keeps
+the proof shell lock and the queue span even in case
+`proof-action-list' gets empty. Coq uses this feature to hold back
+Require commands and the following text until the asynchronous
+background compilation finishes.
+
+ -- Variable: proof-second-action-list-active
+     Signals that some items are waiting outside of
+     ``proof-action-list''.
+     If this is t it means that some items from the queue region are
+     waiting for being processed in a place different from
+     ``proof-action-list''. In this case Proof General must behave as if
+     ``proof-action-list'' would be non-empty, when it is, in fact,
+     empty.
+
+     This is used, for instance, for parallel background compilation
+     for Coq: The Require command and the following items are not put
+     into ``proof-action-list'' and are stored somewhere else until the
+     background compilation finishes. Then those items are put into
+     ``proof-action-list'' for getting processed.
+
  -- Variable: pg-subterm-anns-use-stack
      Choice of syntax tree encoding for terms.
 
@@ -3701,14 +3727,23 @@ from the prover process is also kept, in `proof-shell-last-prompt'.
      text matching ``proof-shell-eager-annotation-end''.
 
 The main processing point which triggers other actions is
-`proof-shell-filter'.
+`proof-shell-filter'. It is called from `proof-shell-filter-wrapper',
+which itself is called from an ordinary Emacs process filter inside the
+simplified `comint' library that is distributed with Proof General (in
+`lib/scomint.el').
 
- -- Function: proof-shell-filter str
+ -- Function: proof-shell-filter
      Master filter for the proof assistant shell-process.
      A function for ``scomint-output-filter-functions''.
 
-     Deal with output STR and issue new input from the queue.  This is
-     an important internal function.
+     Deal with output and issue new input from the queue. This is an
+     important internal function. The output must be collected from
+     ``proof-shell-buffer'' for the following reason. This function
+     might block inside ``process-send-string'' when sending input to
+     the proof assistant or to prooftree. In this case Emacs might call
+     the process filter again while the previous instance is still
+     running. ``proof-shell-filter-wrapper'' detects and delays such
+     calls but does not buffer the output.
 
      Handle urgent messages first.  As many as possible are processed,
      using the function ``proof-shell-process-urgent-messages''.
@@ -3760,6 +3795,22 @@ The main processing point which triggers other actions is
 
      After processing the current output, the last step undertaken by
      the filter is to send the next command from the queue.
+
+ -- Function: proof-shell-filter-wrapper str-do-not-use
+     Wrapper for ``proof-shell-filter'', protecting against parallel
+     calls.
+     In Emacs a process filter function can be called while the same
+     filter is currently running for the same process, for instance,
+     when the filter bocks on I/O. This wrapper protects the main entry
+     point, ``proof-shell-filter'' against such parallel, overlapping
+     calls.
+
+     The argument STR-DO-NOT-USE contains the most recent output, but
+     is discarded. ``proof-shell-filter'' collects the output from
+     ``proof-shell-buffer'' (where it is inserted by
+     ``scomint-output-filter''), relieving this function from the task
+     to buffer the output that arrives during parallel, overlapping
+     calls.
 
 
 File: PG-adapting.info,  Node: Debugging,  Prev: Proof shell mode,  Up: Internals of Proof General
@@ -3942,7 +3993,7 @@ B.1 demoisa-easy.el
      ;;
      ;; Author: David Aspinall <David.Aspinall@ed.ac.uk>
      ;;
-     ;; PG-adapting.texi,v 12.6 2012/05/29 14:53:59 tews Exp
+     ;; PG-adapting.texi,v 12.8 2013/01/10 12:53:40 tews Exp
      ;;
      ;; This is an alternative version of demoisa.el which uses the
      ;; proof-easy-config macro to do the work of declaring derived modes,
@@ -4003,7 +4054,7 @@ B.2 demoisa.el
      ;;
      ;; Author: David Aspinall <David.Aspinall@ed.ac.uk>
      ;;
-     ;; PG-adapting.texi,v 12.6 2012/05/29 14:53:59 tews Exp
+     ;; PG-adapting.texi,v 12.8 2013/01/10 12:53:40 tews Exp
      ;;
      ;; =================================================================
      ;;
@@ -4177,7 +4228,7 @@ Function and Command Index
                                                               (line  24)
 * proof-deftoggle:                       Configuration variable mechanisms.
                                                               (line 112)
-* proof-extend-queue:                    Proof shell mode.    (line 168)
+* proof-extend-queue:                    Proof shell mode.    (line 195)
 * proof-format-filename:                 Useful functions and macros.
                                                               (line  77)
 * proof-generic-count-undos:             Configuring undo behaviour.
@@ -4186,7 +4237,7 @@ Function and Command Index
                                                               (line  72)
 * proof-generic-state-preserving-p:      Safe (state-preserving) commands.
                                                               (line  22)
-* proof-grab-lock:                       Proof shell mode.    (line 234)
+* proof-grab-lock:                       Proof shell mode.    (line 261)
 * proof-init-segmentation:               Proof script mode.   (line  30)
 * proof-insert:                          Useful functions and macros.
                                                               (line  18)
@@ -4194,7 +4245,7 @@ Function and Command Index
                                                               (line 125)
 * proof-register-possibly-new-processed-file: Proof script mode.
                                                               (line  56)
-* proof-release-lock:                    Proof shell mode.    (line 239)
+* proof-release-lock:                    Proof shell mode.    (line 266)
 * proof-restart-buffers:                 Proof script mode.   (line 233)
 * proof-retract-until-point:             Proof script mode.   (line 200)
 * proof-script-generic-parse-cmdend:     Proof script mode.   (line 161)
@@ -4205,20 +4256,21 @@ Function and Command Index
 * proof-semis-to-vanillas:               Proof script mode.   (line 173)
 * proof-set-value:                       Configuration variable mechanisms.
                                                               (line  98)
-* proof-shell-bail-out:                  Proof shell mode.    (line 137)
-* proof-shell-exec-loop:                 Proof shell mode.    (line 180)
-* proof-shell-exit:                      Proof shell mode.    (line 119)
-* proof-shell-filter:                    Proof shell mode.    (line 422)
-* proof-shell-filter-manage-output:      Proof shell mode.    (line 466)
-* proof-shell-handle-delayed-output:     Proof shell mode.    (line 357)
-* proof-shell-handle-immediate-output:   Proof shell mode.    (line 334)
-* proof-shell-insert:                    Proof shell mode.    (line 204)
+* proof-shell-bail-out:                  Proof shell mode.    (line 164)
+* proof-shell-exec-loop:                 Proof shell mode.    (line 207)
+* proof-shell-exit:                      Proof shell mode.    (line 146)
+* proof-shell-filter:                    Proof shell mode.    (line 452)
+* proof-shell-filter-manage-output:      Proof shell mode.    (line 502)
+* proof-shell-filter-wrapper:            Proof shell mode.    (line 516)
+* proof-shell-handle-delayed-output:     Proof shell mode.    (line 384)
+* proof-shell-handle-immediate-output:   Proof shell mode.    (line 361)
+* proof-shell-insert:                    Proof shell mode.    (line 231)
 * proof-shell-invisible-command:         Useful functions and macros.
                                                               (line  36)
-* proof-shell-kill-function:             Proof shell mode.    (line 113)
-* proof-shell-process-urgent-message:    Proof shell mode.    (line 406)
-* proof-shell-restart:                   Proof shell mode.    (line 144)
-* proof-shell-start:                     Proof shell mode.    (line  97)
+* proof-shell-kill-function:             Proof shell mode.    (line 140)
+* proof-shell-process-urgent-message:    Proof shell mode.    (line 433)
+* proof-shell-restart:                   Proof shell mode.    (line 171)
+* proof-shell-start:                     Proof shell mode.    (line 124)
 * proof-tree-external-display-toggle:    Guards.              (line  39)
 * proof-tree-handle-delayed-output:      Urgent and Delayed Actions.
                                                               (line  45)
@@ -4265,7 +4317,7 @@ Variable and User Option Index
                                                               (line  13)
 * pg-goals-error-regexp:                 Goals Buffer Settings.
                                                               (line  23)
-* pg-subterm-anns-use-stack:             Proof shell mode.    (line  87)
+* pg-subterm-anns-use-stack:             Proof shell mode.    (line 114)
 * pg-subterm-end-char:                   Goals Buffer Settings.
                                                               (line  65)
 * pg-subterm-first-special-char:         Settings for matching various output from proof process.
@@ -4387,6 +4439,7 @@ Variable and User Option Index
                                                               (line  33)
 * proof-script-syntax-table-entries:     Configuring Editing Syntax.
                                                               (line  16)
+* proof-second-action-list-active:       Proof shell mode.    (line  99)
 * proof-shell-annotated-prompt-regexp:   Settings for matching various output from proof process.
                                                               (line  19)
 * proof-shell-assumption-regexp:         Settings for matching various output from proof process.
@@ -4405,9 +4458,9 @@ Variable and User Option Index
                                                               (line  54)
 * proof-shell-compute-new-files-list:    Settings for matching urgent messages from proof process.
                                                               (line 208)
-* proof-shell-delayed-output-end:        Proof shell mode.    (line 326)
-* proof-shell-delayed-output-flags:      Proof shell mode.    (line 330)
-* proof-shell-delayed-output-start:      Proof shell mode.    (line 322)
+* proof-shell-delayed-output-end:        Proof shell mode.    (line 353)
+* proof-shell-delayed-output-flags:      Proof shell mode.    (line 357)
+* proof-shell-delayed-output-start:      Proof shell mode.    (line 349)
 * proof-shell-eager-annotation-end <1>:  Handling Multiple Files.
                                                               (line 112)
 * proof-shell-eager-annotation-end:      Settings for matching urgent messages from proof process.
@@ -4441,9 +4494,9 @@ Variable and User Option Index
                                                               (line  94)
 * proof-shell-interrupt-regexp:          Settings for matching various output from proof process.
                                                               (line  51)
-* proof-shell-last-output:               Proof shell mode.    (line 278)
-* proof-shell-last-output-kind:          Proof shell mode.    (line 282)
-* proof-shell-last-prompt:               Proof shell mode.    (line 273)
+* proof-shell-last-output:               Proof shell mode.    (line 305)
+* proof-shell-last-output-kind:          Proof shell mode.    (line 309)
+* proof-shell-last-prompt:               Proof shell mode.    (line 300)
 * proof-shell-pre-interrupt-hook:        Hooks and other settings.
                                                               (line  40)
 * proof-shell-pre-sync-init-cmd:         Proof shell commands.
@@ -4481,7 +4534,7 @@ Variable and User Option Index
                                                               (line 102)
 * proof-shell-strip-crs-from-input:      Script input to the shell.
                                                               (line  14)
-* proof-shell-strip-crs-from-output:     Proof shell mode.    (line 267)
+* proof-shell-strip-crs-from-output:     Proof shell mode.    (line 294)
 * proof-shell-syntax-table-entries:      Configuring Editing Syntax.
                                                               (line  25)
 * proof-shell-theorem-dependency-list-regexp: Settings for matching urgent messages from proof process.
@@ -4490,7 +4543,7 @@ Variable and User Option Index
                                                               (line 107)
 * proof-shell-truncate-before-error:     Settings for matching various output from proof process.
                                                               (line  64)
-* proof-shell-urgent-message-marker:     Proof shell mode.    (line 402)
+* proof-shell-urgent-message-marker:     Proof shell mode.    (line 429)
 * proof-showproof-command:               Settings for generic user-level commands.
                                                               (line  19)
 * proof-splash-contents:                 Splash Screen Settings.
@@ -4573,69 +4626,69 @@ Node: Future3040
 Node: Credits4633
 Node: Beginning with a New Prover4978
 Node: Overview of adding a new prover7025
-Node: Demonstration instance and easy configuration10409
-Node: Major modes used by Proof General13824
-Node: Menus and Toolbar and User-level Commands15564
-Node: Settings for generic user-level commands16232
-Node: Menu configuration17809
-Node: Toolbar configuration18772
-Node: Proof Script Settings20999
-Node: Recognizing commands and comments21731
-Node: Recognizing proofs27585
-Node: Recognizing other elements31696
-Node: Configuring undo behaviour34058
-Node: Nested proofs39113
-Node: Safe (state-preserving) commands40826
-Node: Activate scripting hook41798
-Node: Automatic multiple files42801
-Node: Completely asserted buffers43791
-Node: Completions45364
-Node: Proof Shell Settings46829
-Node: Proof shell commands48196
-Node: Script input to the shell55472
-Node: Settings for matching various output from proof process58795
-Node: Settings for matching urgent messages from proof process64161
-Node: Hooks and other settings75004
-Node: Goals Buffer Settings77974
-Node: Splash Screen Settings80523
-Node: Global Constants81322
-Node: Handling Multiple Files82116
-Node: Configuring Editing Syntax90165
-Node: Configuring Font Lock92177
-Node: Configuring Tokens95501
-Node: Configuring Proof-Tree Visualization97492
-Node: Prerequisites98149
-Node: Proof-Tree Display Internals101032
-Node: Organization of the Code101693
-Node: Communication105860
-Node: Guards107073
-Node: Urgent and Delayed Actions109190
-Node: Full Annotation111700
-Node: Configuring Prooftree for a New Proof Assistant112363
-Node: Proof Tree Elisp configuration112845
-Node: Prooftree Adaption113795
-Node: Writing More Lisp Code114573
-Node: Default values for generic settings115341
-Node: Adding prover-specific configurations116471
-Node: Useful variables117856
-Node: Useful functions and macros118451
-Node: Internals of Proof General122382
-Node: Spans123325
-Node: Proof General site configuration123691
-Node: Configuration variable mechanisms126429
-Node: Global variables131783
-Node: Proof script mode134119
-Node: Proof shell mode145422
-Node: Debugging166336
-Node: Plans and Ideas167103
-Node: Proof by pointing and similar features167942
-Node: Granularity of atomic command sequences169678
-Node: Browser mode for script files and theories171937
-Node: Demonstration Instantiations173007
-Node: demoisa-easy.el173557
-Node: demoisa.el175955
-Node: Function Index181455
-Node: Variable Index187171
-Node: Concept Index208107
+Node: Demonstration instance and easy configuration10375
+Node: Major modes used by Proof General13790
+Node: Menus and Toolbar and User-level Commands15530
+Node: Settings for generic user-level commands16198
+Node: Menu configuration17775
+Node: Toolbar configuration18738
+Node: Proof Script Settings20965
+Node: Recognizing commands and comments21697
+Node: Recognizing proofs27551
+Node: Recognizing other elements31662
+Node: Configuring undo behaviour34024
+Node: Nested proofs39079
+Node: Safe (state-preserving) commands40792
+Node: Activate scripting hook41764
+Node: Automatic multiple files42767
+Node: Completely asserted buffers43757
+Node: Completions45330
+Node: Proof Shell Settings46795
+Node: Proof shell commands48162
+Node: Script input to the shell55438
+Node: Settings for matching various output from proof process58761
+Node: Settings for matching urgent messages from proof process64127
+Node: Hooks and other settings74970
+Node: Goals Buffer Settings77940
+Node: Splash Screen Settings80489
+Node: Global Constants81288
+Node: Handling Multiple Files82082
+Node: Configuring Editing Syntax90131
+Node: Configuring Font Lock92143
+Node: Configuring Tokens95467
+Node: Configuring Proof-Tree Visualization97458
+Node: Prerequisites98115
+Node: Proof-Tree Display Internals100998
+Node: Organization of the Code101659
+Node: Communication105826
+Node: Guards107039
+Node: Urgent and Delayed Actions109156
+Node: Full Annotation111666
+Node: Configuring Prooftree for a New Proof Assistant112329
+Node: Proof Tree Elisp configuration112811
+Node: Prooftree Adaption113761
+Node: Writing More Lisp Code114539
+Node: Default values for generic settings115307
+Node: Adding prover-specific configurations116437
+Node: Useful variables117822
+Node: Useful functions and macros118417
+Node: Internals of Proof General122348
+Node: Spans123291
+Node: Proof General site configuration123657
+Node: Configuration variable mechanisms126382
+Node: Global variables131736
+Node: Proof script mode134072
+Node: Proof shell mode145375
+Node: Debugging169134
+Node: Plans and Ideas169901
+Node: Proof by pointing and similar features170740
+Node: Granularity of atomic command sequences172476
+Node: Browser mode for script files and theories174735
+Node: Demonstration Instantiations175805
+Node: demoisa-easy.el176355
+Node: demoisa.el178753
+Node: Function Index184253
+Node: Variable Index190042
+Node: Concept Index211051
 
 End Tag Table
