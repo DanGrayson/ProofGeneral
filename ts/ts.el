@@ -46,7 +46,6 @@
 
 (proof-easy-config
  'ts "TS"	    				; the string here must be the symbol's name made upper case
- proof-general-debug			t 	; just for debugging
  proof-terminal-string			"."
  proof-save-command-regexp		"Defined." ; not implemented in the checker yet
  proof-script-syntax-table-entries      '( ?# "<" ?\n ">" ?\' "w" ?∏ "w" ?Σ "w" ?λ "w" ?_ "w" ?∐ "w" ?⟶ "_" ?₁ "."  ?₂ "."  ?⟾ "."  ?⟼ "." )
@@ -61,7 +60,7 @@
  proof-undo-n-times-cmd			"Back %s."
  proof-ignore-for-undo-count		"Back[^.]*\\."
  proof-assistant-home-page		"https://github.com/DanGrayson/checker"
- proof-shell-annotated-prompt-regexp	"^i\\([0-9]+\\) = "
+ proof-shell-annotated-prompt-regexp	"^i\\([0-9]+\\) = " ; figure out how to get the statenum here stored in the corresponding span, as in coq/*.el
  proof-shell-error-regexp		"^File \""
  proof-script-font-lock-keywords	ts-mode-font-lock-keywords
  proof-goals-font-lock-keywords		ts-mode-font-lock-keywords
