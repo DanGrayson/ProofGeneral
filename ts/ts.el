@@ -45,14 +45,16 @@
 	     )))
 
 (proof-easy-config
- 'ts "TS"				; the string here must be the symbol's name made upper case
+ 'ts "TS"	    				; the string here must be the symbol's name made upper case
+ proof-general-debug			t 	; just for debugging
  proof-terminal-string			"."
  proof-save-command-regexp		"Defined." ; not implemented in the checker yet
  proof-script-syntax-table-entries      '( ?# "<" ?\n ">" ?\' "w" ?∏ "w" ?Σ "w" ?λ "w" ?_ "w" ?∐ "w" ?⟶ "_" ?₁ "."  ?₂ "."  ?⟾ "."  ?⟼ "." )
  proof-script-comment-start		"#"
  proof-script-comment-end		""
  proof-prog-name			"checker --proof-general"
- proof-arbitrary-undo-positions		t	; if t, then make (proof-last-goal-or-goalsave) work
+ proof-arbitrary-undo-positions		nil
+ proof-forget-id-command		"Back."
  proof-kill-goal-command		"Back."
  proof-undo-n-times-cmd			"Back %s."
  proof-ignore-for-undo-count		"Back[^.]*\\."
