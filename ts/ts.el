@@ -50,9 +50,11 @@
  proof-terminal-string			"."
  proof-save-command-regexp		"Defined." ; not implemented in the checker yet
  proof-script-syntax-table-entries      '( ?# "<" ?\n ">" ?\' "w" ?∏ "w" ?Σ "w" ?λ "w" ?_ "w" ?∐ "w" ?⟶ "_" ?₁ "."  ?₂ "."  ?⟾ "."  ?⟼ "." )
+ proof-shell-syntax-table-entries       '(                ?\' "w" ?∏ "w" ?Σ "w" ?λ "w" ?_ "w" ?∐ "w" ?⟶ "_" ?₁ "."  ?₂ "."  ?⟾ "."  ?⟼ "." )
  proof-script-comment-start		"#"
  proof-script-comment-end		""
  proof-prog-name			"checker --proof-general"
+ proof-shell-strip-crs-from-input	nil
  proof-arbitrary-undo-positions		nil
  proof-forget-id-command		"Back."
  proof-kill-goal-command		"Back."
@@ -62,6 +64,8 @@
  proof-shell-annotated-prompt-regexp	"^i\\([0-9]+\\) = "
  proof-shell-error-regexp		"^File \""
  proof-script-font-lock-keywords	ts-mode-font-lock-keywords
+ proof-goals-font-lock-keywords		ts-mode-font-lock-keywords
+ proof-response-font-lock-keywords	ts-mode-font-lock-keywords
  )
 
 (provide 'ts)
