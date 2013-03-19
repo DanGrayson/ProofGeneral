@@ -46,7 +46,7 @@
 
 (proof-easy-config
  'ts "TS"	    				; the string here must be the symbol's name made upper case
- proof-terminal-string			"."
+ proof-terminal-string			".."
  proof-save-command-regexp		"Defined." ; not implemented in the checker yet
  proof-script-syntax-table-entries      '( ?# "<" ?\n ">" ?\' "w" ?∏ "w" ?Σ "w" ?λ "w" ?_ "w" ?∐ "w" ?⟶ "_" ?₁ "."  ?₂ "."  ?⟾ "."  ?⟼ "." )
  proof-shell-syntax-table-entries       '(                ?\' "w" ?∏ "w" ?Σ "w" ?λ "w" ?_ "w" ?∐ "w" ?⟶ "_" ?₁ "."  ?₂ "."  ?⟾ "."  ?⟼ "." )
