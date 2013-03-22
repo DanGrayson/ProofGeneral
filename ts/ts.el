@@ -11,7 +11,7 @@
 		       "Texp" "Oexp" "Tequal" "Oequal"
 		       "max" "Singleton" "LF_Empty" "pair" "CAR" "CDR" "WildCard" ))
 
-(defvar ts-commands '( "Clear" "Universes" "LF" "TS" "TTS" "Mode"
+(defvar ts-commands '( "Clear" "Universes" "LF" "TS" "TTS" "Mode" "Verify"
 		       "Check" "Alpha" "End" "Clear" "Show" "Include" "Back" "BackTo"))
 
 ; should use font-lock-compile-keywords !
